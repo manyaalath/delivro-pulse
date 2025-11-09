@@ -15,9 +15,6 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import anthropic
 import json
 from datasets import load_dataset
-import lightgbm as lgb
-from catboost import CatBoostClassifier
-from imblearn.over_sampling import SMOTE
 
 # Initialize FastAPI
 app = FastAPI(title="📦 Logistics Post-Mortem Analyzer API")
@@ -156,7 +153,7 @@ def train_lade_model():
             "accuracy": round(accuracy_score(y_true, y_pred)*100, 2),
             "precision": round(precision_score(y_true, y_pred)*100, 2),
             "recall": round(recall_score(y_true, y_pred)*100, 2),
-            "f1": round(f1_score(y_true, y_pred)*100, 2)
+            "f1_score": round(f1_score(y_true, y_pred)*100, 2)
         }
 
     lgb_metrics = metrics(y_test, lgb_preds)
@@ -422,14 +419,24 @@ async def get_insights():
         
         # Load model metrics
         global model_metrics
-        if not model_metrics and os.path.exists("model.pkl"):
-            # Try to load saved metrics or return defaults
-            model_metrics = {
-                "accuracy": 0.0,
-                "precision": 0.0,
-                "recall": 0.0,
-                "f1_score": 0.0
-            }
+        if not model_metrics:
+            if os.path.exists("metrics.json"):
+                with open("metrics.json", "r") as f:
+                    model_metrics = json.load(f)
+                # Normalize keys to match frontend expectations
+                model_metrics = {
+                    "accuracy": model_metrics.get("accuracy", 0) / 100,  # Convert to decimal
+                    "f1_score": model_metrics.get("f1", 0) / 100,
+                    "precision": model_metrics.get("precision", 0) / 100,
+                    "recall": model_metrics.get("recall", 0) / 100
+                }
+            else:
+                model_metrics = {
+                    "accuracy": 0.0,
+                    "f1_score": 0.0,
+                    "precision": 0.0,
+                    "recall": 0.0
+                }
         
         return InsightsResponse(
             most_delayed_city=most_delayed_city,
@@ -486,6 +493,37 @@ Keep it concise and business-focused."""
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
 
+@app.get("/geo")
+async def get_geo_data():
+    """Get geospatial data for map visualization"""
+    try:
+        # Fetch data
+        df = fetch_data_from_supabase()
+        df = preprocess_data(df)
+
+        # Group by city/region and calculate average delay
+        geo_data = df.groupby(['city', 'region_id']).agg({
+            'lat': 'mean',
+            'lng': 'mean',
+            'delay_min': 'mean'
+        }).reset_index()
+
+        # Convert to expected format
+        points = []
+        for _, row in geo_data.iterrows():
+            points.append({
+                'city': str(row['city']),
+                'region_id': str(row['region_id']),
+                'lat': float(row['lat']),
+                'lng': float(row['lng']),
+                'avg_delay': round(float(row['delay_min']), 2)
+            })
+
+        return {"points": points}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Geo data generation failed: {str(e)}")
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
@@ -497,4 +535,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8001)

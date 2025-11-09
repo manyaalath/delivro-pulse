@@ -37,7 +37,7 @@ export const MapView = () => {
 
   useEffect(() => {
     console.log("🌍 Fetching /geo data…");
-    fetch("http://localhost:8000/geo")
+    fetch("http://127.0.0.1:8001/geo")
       .then((res) => res.json())
       .then((data) => {
         setGeoPoints(data.points);
