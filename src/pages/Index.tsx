@@ -7,6 +7,7 @@ import { DeliveryMap } from "@/components/DeliveryMap";
 import { AnalyticsCharts } from "@/components/AnalyticsCharts";
 import { TopCouriers } from "@/components/TopCouriers";
 import { InsightsButton } from "@/components/InsightsButton";
+import { ModelPerformance } from "@/components/ModelPerformance";
 import { toast } from "sonner";
 
 export interface Delivery {
@@ -130,11 +131,13 @@ const Index = () => {
 
         <main className="flex-1 p-6 space-y-6">
           <KPICards deliveries={filteredDeliveries} loading={loading} />
-          
+
+          <ModelPerformance />
+
           <DeliveryMap deliveries={filteredDeliveries} />
-          
+
           <AnalyticsCharts deliveries={filteredDeliveries} />
-          
+
           <TopCouriers deliveries={filteredDeliveries} />
         </main>
       </div>
