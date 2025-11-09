@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { FilterSidebar } from "@/components/FilterSidebar";
 import { KPICards } from "@/components/KPICards";
-import { DeliveryMap } from "@/components/DeliveryMap";
+import { MapView } from "@/components/MapView";
 import { AnalyticsCharts } from "@/components/AnalyticsCharts";
 import { TopCouriers } from "@/components/TopCouriers";
 import { InsightsButton } from "@/components/InsightsButton";
@@ -134,7 +134,7 @@ const Index = () => {
 
           <ModelPerformance />
 
-          <DeliveryMap deliveries={filteredDeliveries} />
+          <MapView />
 
           <AnalyticsCharts deliveries={filteredDeliveries} />
 
