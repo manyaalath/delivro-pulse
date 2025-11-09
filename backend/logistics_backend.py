@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Query
+import logging
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
@@ -12,7 +13,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from datasets import load_dataset
+
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
 app = FastAPI(title="📦 DELIVRO-PULSE Logistics Backend API")
@@ -66,7 +71,7 @@ class InsightsResponse(BaseModel):
     late_delivery_rate: float
 
 class GeoResponse(BaseModel):
-    geo_data: List[Dict[str, Any]]
+    points: List[Dict[str, Any]]
 
 class HealthResponse(BaseModel):
     status: str
@@ -76,8 +81,7 @@ class HealthResponse(BaseModel):
 # Helper Functions
 def train_lade_model():
     print("🚀 Loading LaDe dataset...")
-    dataset = load_dataset("Cainiao-AI/LaDe")
-    df = pd.DataFrame(dataset['train'])
+    df = pd.read_csv("https://huggingface.co/datasets/Cainiao-AI/LaDe/resolve/main/delivery/delivery_bj.csv")
 
     # Select relevant columns
     cols = ['package_id', 'courier_id', 'city', 'region_id', 'lng', 'lat', 'accept_time', 'delivery_time']
@@ -230,8 +234,14 @@ async def root():
     return {
         "message": "📦 DELIVRO-PULSE Logistics Backend API",
         "version": "1.0.0",
-        "endpoints": ["/train", "/predict", "/insights", "/geo", "/health"]
+        "endpoints": ["/welcome", "/train", "/predict", "/insights", "/geo", "/health"]
     }
+
+@app.get("/welcome")
+async def welcome(request: Request):
+    """Returns a welcome message and logs request metadata"""
+    logger.info(f"Request received: {request.method} {request.url.path}")
+    return {"message": "Welcome to the DELIVRO-PULSE Logistics Backend API!"}
 
 @app.post("/train", response_model=TrainResponse)
 async def train_model():
@@ -337,10 +347,45 @@ async def get_insights():
 async def get_geo_data():
     """Get geo data for Mapbox visualization"""
     try:
-        df = fetch_data_from_supabase()
-        df = preprocess_data(df)
-        geo_data = df[['lat', 'lng', 'delay_min', 'late_flag', 'city', 'region_id']].to_dict('records')
-        return GeoResponse(geo_data=geo_data)
+        base_url = "https://huggingface.co/datasets/Cainiao-AI/LaDe/raw/main/delivery/"
+        cities = ["delivery_bj.csv", "delivery_sh.csv", "delivery_gz.csv"]
+        dfs = []
+
+        for file in cities:
+            url = f"{base_url}{file}"
+            df_city = pd.read_csv(url)
+            dfs.append(df_city)
+
+        df = pd.concat(dfs, ignore_index=True)
+
+        # Keep safe columns only
+        keep_cols = ["city","region_id","accept_time","delivery_time","accept_gps_lat","accept_gps_lng"]
+        df = df[[c for c in keep_cols if c in df.columns]].dropna(subset=["accept_time","delivery_time"])
+
+        # Normalize column names
+        df.rename(columns={
+            "accept_gps_lat": "lat",
+            "accept_gps_lng": "lng"
+        }, inplace=True)
+
+        # Time parsing & delay calculation
+        df["accept_time"] = pd.to_datetime(df["accept_time"], errors="coerce")
+        df["delivery_time"] = pd.to_datetime(df["delivery_time"], errors="coerce")
+        df["delay_min"] = (df["delivery_time"] - df["accept_time"]).dt.total_seconds() / 60
+        df = df.dropna(subset=["lat","lng","delay_min"])
+
+        # Group by city and compute average delay + mean coordinates
+        grouped = (
+            df.groupby(["city"])
+            .agg({"lat":"mean","lng":"mean","delay_min":"mean"})
+            .reset_index()
+        )
+        grouped.rename(columns={"delay_min": "avg_delay"}, inplace=True)
+
+        points = grouped.to_dict(orient="records")
+
+        print(f"✅ Geo data prepared successfully: {len(points)} city points.")
+        return GeoResponse(points=points)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Geo data retrieval failed: {str(e)}")
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { FilterSidebar } from "@/components/FilterSidebar";
@@ -40,6 +40,7 @@ const Index = () => {
     courier: "",
   });
   const [loading, setLoading] = useState(true);
+  const modelPerformanceRef = useRef<{ refreshMetrics: () => void } | null>(null);
 
   // Fetch deliveries
   const fetchDeliveries = async () => {
@@ -132,9 +133,12 @@ const Index = () => {
         <main className="flex-1 p-6 space-y-6">
           <KPICards deliveries={filteredDeliveries} loading={loading} />
 
-          <ModelPerformance />
+          <ModelPerformance ref={modelPerformanceRef} />
 
-          <MapView />
+          <section className="mt-8">
+            <h2 className="text-xl font-semibold mb-2 text-cyan-400">Geospatial Delay Visualization 🌍</h2>
+            <MapView />
+          </section>
 
           <AnalyticsCharts deliveries={filteredDeliveries} />
 
@@ -142,7 +146,10 @@ const Index = () => {
         </main>
       </div>
 
-      <InsightsButton deliveries={filteredDeliveries} />
+      <InsightsButton
+        deliveries={filteredDeliveries}
+        onInsightsRefresh={() => modelPerformanceRef.current?.refreshMetrics()}
+      />
     </div>
   );
 };

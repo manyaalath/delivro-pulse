@@ -8,30 +8,50 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Delivery } from "@/pages/Index";
 
-interface InsightsButtonProps {
-  deliveries: Delivery[];
+interface ModelMetrics {
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1: number;
 }
 
-export const InsightsButton = ({ deliveries }: InsightsButtonProps) => {
+interface InsightsButtonProps {
+  deliveries: Delivery[];
+  onInsightsRefresh?: () => void; // Optional callback to refresh other components
+}
+
+export const InsightsButton = ({ deliveries, onInsightsRefresh }: InsightsButtonProps) => {
   const [open, setOpen] = useState(false);
-  const [insights, setInsights] = useState("");
+  const [metrics, setMetrics] = useState<ModelMetrics | null>(null);
   const [loading, setLoading] = useState(false);
 
   const generateInsights = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-insights", {
-        body: { deliveries },
+      // Optional retrain
+      await fetch("http://localhost:8000/train", {
+        method: "POST",
       });
 
-      if (error) throw error;
-
-      setInsights(data.insights);
+      // Get insights
+      const response = await fetch("http://localhost:8000/insights");
+      if (!response.ok) {
+        throw new Error("Failed to fetch insights");
+      }
+      const data = await response.json();
+      setMetrics(data.model_metrics);
       setOpen(true);
+
+      // Log success
+      console.log("🧠 Insights refreshed");
+
+      // Trigger refresh of other components if callback provided
+      if (onInsightsRefresh) {
+        onInsightsRefresh();
+      }
     } catch (error: any) {
       console.error("Insights error:", error);
       toast.error("Failed to generate insights: " + error.message);
@@ -56,16 +76,33 @@ export const InsightsButton = ({ deliveries }: InsightsButtonProps) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-primary" />
-              AI-Generated Insights
+              Model Performance Metrics
             </DialogTitle>
             <DialogDescription>
-              Analysis of your logistics data
+              Latest model metrics after retraining
             </DialogDescription>
           </DialogHeader>
 
-          <div className="prose prose-invert max-w-none">
-            <p className="whitespace-pre-wrap">{insights}</p>
-          </div>
+          {metrics && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Accuracy</p>
+                <p className="text-2xl font-bold">{(metrics.accuracy * 100).toFixed(2)}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Precision</p>
+                <p className="text-2xl font-bold">{(metrics.precision * 100).toFixed(2)}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Recall</p>
+                <p className="text-2xl font-bold">{(metrics.recall * 100).toFixed(2)}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">F1 Score</p>
+                <p className="text-2xl font-bold">{(metrics.f1 * 100).toFixed(2)}%</p>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

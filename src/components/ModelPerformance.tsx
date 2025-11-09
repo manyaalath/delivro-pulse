@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
@@ -14,27 +14,33 @@ interface InsightsResponse {
   model_metrics: ModelMetrics;
 }
 
-export const ModelPerformance = () => {
+export const ModelPerformance = forwardRef<{ refreshMetrics: () => void }>((props, ref) => {
   const [metrics, setMetrics] = useState<ModelMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        const response = await fetch("http://localhost:8000/insights");
-        if (!response.ok) {
-          throw new Error("Failed to fetch model metrics");
-        }
-        const data: InsightsResponse = await response.json();
-        setMetrics(data.model_metrics);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+  const fetchMetrics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch("http://localhost:8000/insights");
+      if (!response.ok) {
+        throw new Error("Failed to fetch model metrics");
       }
-    };
+      const data: InsightsResponse = await response.json();
+      setMetrics(data.model_metrics);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useImperativeHandle(ref, () => ({
+    refreshMetrics: fetchMetrics,
+  }));
+
+  useEffect(() => {
     fetchMetrics();
   }, []);
 
@@ -126,4 +132,4 @@ export const ModelPerformance = () => {
       </CardContent>
     </Card>
   );
-};
+});
