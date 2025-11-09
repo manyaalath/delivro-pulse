@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      deliveries: {
+        Row: {
+          accept_time: string
+          city: string
+          courier_id: string
+          created_at: string | null
+          delay_min: number | null
+          delivery_time: string
+          lat: number
+          lng: number
+          package_id: string
+          region_id: string
+          status: string | null
+        }
+        Insert: {
+          accept_time: string
+          city: string
+          courier_id: string
+          created_at?: string | null
+          delay_min?: number | null
+          delivery_time: string
+          lat: number
+          lng: number
+          package_id: string
+          region_id: string
+          status?: string | null
+        }
+        Update: {
+          accept_time?: string
+          city?: string
+          courier_id?: string
+          created_at?: string | null
+          delay_min?: number | null
+          delivery_time?: string
+          lat?: number
+          lng?: number
+          package_id?: string
+          region_id?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
